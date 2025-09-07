@@ -1,4 +1,4 @@
-name: Build, Analyze, Scan, and Deploy
+name: Build, Analyze, Scan, and Deploy 
 
 on:
   push:

@@ -1,4 +1,4 @@
-name: Build
+name: Build and Deploy
 
 on:
   push:
@@ -12,26 +12,27 @@ jobs:
     steps:
       - uses: actions/checkout@v2
         with:
-          fetch-depth: 0
+          fetch-depth: 0  # Needed for SonarQube analysis
 
-      - uses: sonarsource/sonarqube-scan-action@master
+      - name: SonarQube Scan
+        uses: sonarsource/sonarqube-scan-action@master
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
 
-      # Uncomment if you want the pipeline to fail when Quality Gate fails
-      # - uses: sonarsource/sonarqube-quality-gate-action@master
-      #   timeout-minutes: 5
-      #   env:
-      #     SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-
-      - name: NPM Install dependencies
+      - name: Install dependencies
         run: npm install
 
       - name: Docker Login
         run: docker login -u ${{ secrets.DOCKERHUB_USERNAME }} -p ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Docker Scout Scan (source)
+      - name: Install Docker Scout
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/docker/scout-cli/main/install.sh | sh -s --
+          sudo mv bin/docker-scout /usr/local/bin/
+          docker-scout version
+
+      - name: Docker Scout Scan (source code)
         run: |
           docker-scout quickview fs://.
           docker-scout cves fs://.
@@ -41,24 +42,22 @@ jobs:
           docker build -t myntra .
           docker tag myntra abhishek450/myntra:latest
           docker push abhishek450/myntra:latest
-        env:
-          DOCKER_CLI_ACI: 1
 
-      - name: Docker Scout Image Scan (built image)
+      - name: Docker Scout Scan (built image)
         run: |
           docker-scout quickview abhishek450/myntra:latest
           docker-scout cves abhishek450/myntra:latest
 
   deploy:
     name: Deploy to EKS
-    needs: build   # ✅ match first job name
+    needs: build
     runs-on: [self-hosted]
     steps:
       - name: Pull Docker image
         run: docker pull abhishek450/myntra:latest
 
-      - name: Deploy to container
-        run: docker run -d --name game -p 3000:3000 abhishek450/myntra:latest
+      - name: Run container locally (for testing)
+        run: docker run -d --name myntra -p 3000:3000 abhishek450/myntra:latest
 
       - name: Update kubeconfig
         run: aws eks --region ap-south-1 update-kubeconfig --name EKS_CLOUD

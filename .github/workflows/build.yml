@@ -1,4 +1,4 @@
-name: Build, Analyze, Scan, and Deploy 
+name: CI/CD Pipeline
 
 on:
   push:
@@ -7,20 +7,22 @@ on:
 
 jobs:
   build-analyze-scan:
-    name: Build, Analyze, and Scan
-    runs-on: [self-hosted]
-
+    name: Build, Analyze and Scan
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
+      - uses: actions/checkout@v2
         with:
           fetch-depth: 0
 
-      - name: Build and analyze with SonarQube
+      - name: SonarQube Scan
         uses: sonarsource/sonarqube-scan-action@master
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        with:
+          args: >
+            -Dsonar.projectKey=myntra
+            -Dsonar.sources=.
 
       - name: NPM Install
         run: npm install
@@ -33,13 +35,13 @@ jobs:
           docker-scout quickview fs://.
           docker-scout cves fs://.
 
-      - name: Docker build and push
+      - name: Docker Build and Push
         run: |
           docker build -t myntra .
           docker tag myntra abhishek450/myntra:latest
           docker push abhishek450/myntra:latest
 
-      - name: Docker Scout Image Scan (built image)
+      - name: Docker Scout Scan (built image)
         run: |
           docker-scout quickview abhishek450/myntra:latest
           docker-scout cves abhishek450/myntra:latest
@@ -48,7 +50,6 @@ jobs:
     name: Deploy to EKS
     needs: build-analyze-scan
     runs-on: [self-hosted]
-
     steps:
       - name: Configure AWS credentials
         run: aws eks --region ap-south-1 update-kubeconfig --name EKS_CLOUD

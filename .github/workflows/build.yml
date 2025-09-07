@@ -40,4 +40,27 @@ jobs:
       - name: Docker build and push
         run: |
           docker build -t myntra .
-          docker tag
+          docker tag myntra abhishek450/myntra:latest
+          docker push abhishek450/myntra:latest
+
+      - name: Docker Scout Scan (image)
+        run: |
+          docker-scout quickview abhishek450/myntra:latest
+          docker-scout cves abhishek450/myntra:latest
+
+  deploy:
+    name: Deploy to EKS
+    needs: build
+    runs-on: [self-hosted]
+    steps:
+      - name: Pull Docker image
+        run: docker pull abhishek450/myntra:latest
+
+      - name: Run container locally
+        run: docker run -d --name myntra -p 3000:3000 abhishek450/myntra:latest
+
+      - name: Update kubeconfig
+        run: aws eks --region ap-south-1 update-kubeconfig --name EKS_CLOUD
+
+      - name: Deploy to Kubernetes
+        run: kubectl apply -f deployment-service.yml

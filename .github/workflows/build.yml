@@ -12,10 +12,9 @@ jobs:
     steps:
       - uses: actions/checkout@v2
         with:
-          fetch-depth: 0  # Needed for SonarQube analysis
+          fetch-depth: 0
 
-      - name: SonarQube Scan
-        uses: sonarsource/sonarqube-scan-action@master
+      - uses: sonarsource/sonarqube-scan-action@master
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
@@ -29,7 +28,8 @@ jobs:
       - name: Install Docker Scout
         run: |
           curl -sSfL https://raw.githubusercontent.com/docker/scout-cli/main/install.sh | sh -s --
-          sudo mv bin/docker-scout /usr/local/bin/
+          mkdir -p ~/.docker/cli-plugins
+          sudo cp ~/.docker/cli-plugins/docker-scout /usr/local/bin/
           docker-scout version
 
       - name: Docker Scout Scan (source code)
@@ -40,27 +40,4 @@ jobs:
       - name: Docker build and push
         run: |
           docker build -t myntra .
-          docker tag myntra abhishek450/myntra:latest
-          docker push abhishek450/myntra:latest
-
-      - name: Docker Scout Scan (built image)
-        run: |
-          docker-scout quickview abhishek450/myntra:latest
-          docker-scout cves abhishek450/myntra:latest
-
-  deploy:
-    name: Deploy to EKS
-    needs: build
-    runs-on: [self-hosted]
-    steps:
-      - name: Pull Docker image
-        run: docker pull abhishek450/myntra:latest
-
-      - name: Run container locally (for testing)
-        run: docker run -d --name myntra -p 3000:3000 abhishek450/myntra:latest
-
-      - name: Update kubeconfig
-        run: aws eks --region ap-south-1 update-kubeconfig --name EKS_CLOUD
-
-      - name: Deploy to Kubernetes
-        run: kubectl apply -f deployment-service.yml
+          docker tag
